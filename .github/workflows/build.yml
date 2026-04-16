@@ -13,9 +13,9 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Build APK
-        run: |
-          chmod +x buildozer.spec
-          buildozer android debug
+        run: buildozer android debug
+        env:
+          BUILDOZER_WARN_ON_ROOT: 1
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
