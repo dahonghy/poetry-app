@@ -8,20 +8,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    container: kivy/buildozer:latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        with:
-          workdir: .
-          buildozer_version: stable
-          command: android debug
-        env:
-          BUILDOZER_WARN_ON_ROOT: 1
-          USER: runner
+      - name: Build APK
+        run: |
+          chmod +x buildozer.spec
+          buildozer android debug
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
