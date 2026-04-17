@@ -1,9 +1,3 @@
-[buildozer]
-
-# Buildozer配置
-log_level = 2
-warn_on_root = 1
-
 [app]
 
 # 应用名称
@@ -19,13 +13,13 @@ package.domain = org.example
 source.dir = .
 
 # 源文件包含
-source.include_exts = py,png,jpg,kv,atlas,json,pdf
+source.include_exts = py,png,jpg,kv,atlas,json,ttf,otf,pdf
 
 # 版本
 version = 1.0.0
 
 # 需求
-requirements = python3,kivy
+requirements = python3,kivy,pyjnius
 
 # 支持的Android版本
 android.api = 31
@@ -44,6 +38,9 @@ orientation = portrait
 
 # 全屏
 fullscreen = 0
+
+# 图标
+# icon.filename = icon.png
 
 # 权限
 android.permissions = INTERNET,RECORD_AUDIO
