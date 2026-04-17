@@ -14,10 +14,78 @@ from kivy.uix.treeview import TreeView, TreeViewLabel
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.metrics import dp
 from kivy.core.window import Window
+from kivy.core.text import LabelBase
 import json
 import os
 import random
 from datetime import datetime
+
+# Android平台导入pyjnius用于打开PDF
+try:
+    from jnius import autoclass
+    from android import activity
+    PYTHON_ACTIVITY = autoclass('org.kivy.android.PythonActivity')
+    Intent = autoclass('android.content.Intent')
+    Uri = autoclass('android.net.Uri')
+    File = autoclass('java.io.File')
+    ANDROID_AVAILABLE = True
+except:
+    ANDROID_AVAILABLE = False
+
+# 注册中文字体
+def setup_chinese_font():
+    """设置中文字体，优先使用应用内置的中文字体"""
+    # 首先尝试应用内置的字体文件
+    app_font_paths = [
+        ('NotoSansSC-Regular.otf', 'NotoSansSC'),
+        ('SourceHanSansSC-Regular.otf', 'SourceHanSansSC'),
+        ('DroidSansFallback.ttf', 'DroidSansFallback'),
+    ]
+    
+    font_registered = False
+    registered_font_name = None
+    
+    for font_file, font_name in app_font_paths:
+        app_font = os.path.join(os.path.dirname(__file__), font_file)
+        if os.path.exists(app_font):
+            try:
+                LabelBase.register(font_name, app_font)
+                registered_font_name = font_name
+                font_registered = True
+                print(f"[字体] 成功注册内置字体: {font_name}")
+                break
+            except Exception as e:
+                print(f"[字体] 注册 {font_file} 失败: {e}")
+                continue
+    
+    # 如果内置字体未注册成功，尝试Android系统字体
+    if not font_registered:
+        android_fonts = [
+            ('/system/fonts/DroidSansFallback.ttf', 'DroidSansFallback'),
+            ('/system/fonts/NotoSansCJK-Regular.ttc', 'NotoSansCJK'),
+            ('/system/fonts/NotoSansSC-Regular.otf', 'NotoSansSC'),
+        ]
+        
+        for font_path, font_name in android_fonts:
+            if os.path.exists(font_path):
+                try:
+                    LabelBase.register(font_name, font_path)
+                    registered_font_name = font_name
+                    font_registered = True
+                    print(f"[字体] 成功注册系统字体: {font_name}")
+                    break
+                except:
+                    continue
+    
+    # 设置默认字体
+    if font_registered and registered_font_name:
+        from kivy.config import Config
+        Config.set('kivy', 'default_font', [registered_font_name])
+    
+    return font_registered, registered_font_name
+
+# 执行字体设置
+setup_chinese_font()
 
 # 数据文件
 POETRY_FILE = "poetry_data.json"
@@ -99,11 +167,11 @@ class MainScreen(Screen):
         
         # 分类按钮
         btn_layout = BoxLayout(size_hint_y=0.08, spacing=dp(5))
-        categories = ['必修', '选择性必修', '选修', '个人新增']
+        categories = ['必修', '选择性必修', '选修', '个人新增', '文言文PDF']
         for cat in categories:
             btn = Button(
                 text=cat,
-                font_size='16sp',
+                font_size='14sp',
                 on_press=lambda x, c=cat: self.show_category(c)
             )
             btn_layout.add_widget(btn)
@@ -137,6 +205,15 @@ class MainScreen(Screen):
     
     def show_category(self, category):
         """显示分类内容"""
+        # 特殊处理：PDF分类
+        if category == '文言文PDF':
+            # 尝试用Android系统打开PDF
+            if self.open_pdf():
+                return
+            # 如果打开失败，显示提示
+            self.content_label.text = '[b]📄 高中文言文基础知识点全解读[/b]\n\n[color=F44336]无法打开PDF文件[/color]\n\n请安装PDF阅读器应用，或在电脑端查看。'
+            return
+        
         items = [(name, data) for name, data in self.poetry_data.items()
                  if data.get('category') == category]
         
@@ -160,6 +237,56 @@ class MainScreen(Screen):
                 text += '\n'
         
         self.content_label.text = text
+    
+    def open_pdf(self):
+        """用Android系统打开PDF文件"""
+        if not ANDROID_AVAILABLE:
+            print("[PDF] Android API不可用")
+            return False
+        
+        try:
+            # PDF文件路径
+            pdf_path = os.path.join(os.path.dirname(__file__), '高中文言文基础知识点全解读.pdf')
+            
+            if not os.path.exists(pdf_path):
+                print(f"[PDF] 文件不存在: {pdf_path}")
+                return False
+            
+            print(f"[PDF] 尝试打开: {pdf_path}")
+            
+            # 创建File对象
+            pdf_file = File(pdf_path)
+            
+            # 使用FileProvider获取URI (Android 7.0+)
+            context = PYTHON_ACTIVITY.mActivity
+            package_name = context.getPackageName()
+            
+            try:
+                # 尝试使用FileProvider
+                FileProvider = autoclass('androidx.core.content.FileProvider')
+                uri = FileProvider.getUriForFile(
+                    context,
+                    f"{package_name}.fileprovider",
+                    pdf_file
+                )
+            except:
+                # 如果FileProvider失败，尝试直接使用file:// URI
+                uri = Uri.fromFile(pdf_file)
+            
+            # 创建Intent打开PDF
+            intent = Intent(Intent.ACTION_VIEW)
+            intent.setDataAndType(uri, 'application/pdf')
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            
+            # 启动Activity
+            context.startActivity(intent)
+            print("[PDF] 成功启动PDF阅读器")
+            return True
+            
+        except Exception as e:
+            print(f"[PDF] 打开失败: {e}")
+            return False
     
     def start_fill_test(self, instance):
         """开始填空检测"""
