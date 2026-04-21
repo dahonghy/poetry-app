@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-高中古诗文背诵检测系统 - Kivy手机版（美化版）
+高中古诗文背诵检测系统 - Kivy手机版（修复版）
+解决闪退问题
 """
 
 import os
@@ -10,23 +11,9 @@ from datetime import datetime
 
 # ========== 字体设置必须在导入Kivy其他模块之前 ==========
 from kivy.config import Config
-from kivy.resources import resource_find
 
-# 设置中文字体
-def setup_chinese_font():
-    font_files = ['DroidSansFallback.ttf', 'NotoSansSC-Regular.otf']
-    for font_file in font_files:
-        font_path = resource_find(font_file)
-        if font_path:
-            Config.set('kivy', 'default_font', [font_path])
-            return font_path
-    for font_path in ['/system/fonts/DroidSansFallback.ttf', '/system/fonts/NotoSansCJK-Regular.ttc']:
-        if os.path.exists(font_path):
-            Config.set('kivy', 'default_font', [font_path])
-            return font_path
-    return None
-
-setup_chinese_font()
+# 先设置一个默认字体，防止崩溃
+Config.set('kivy', 'default_font', ['DroidSansFallback.ttf'])
 Config.set('graphics', 'background', '1,1,1,1')
 
 # ========== 导入其他模块 ==========
@@ -38,12 +25,9 @@ from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager, Screen
-from kivy.uix.floatlayout import FloatLayout
 from kivy.metrics import dp
 from kivy.core.window import Window
-from kivy.graphics import Color, RoundedRectangle
 
-# 设置白色背景
 Window.clearcolor = (1, 1, 1, 1)
 
 # Android平台导入
@@ -52,275 +36,282 @@ try:
     PYTHON_ACTIVITY = autoclass('org.kivy.android.PythonActivity')
     Intent = autoclass('android.content.Intent')
     Uri = autoclass('android.net.Uri')
-    File = autoclass('java.io.File')
     ANDROID_AVAILABLE = True
 except:
     ANDROID_AVAILABLE = False
 
 # ========== 颜色主题 ==========
 COLORS = {
-    'primary': (0.2, 0.4, 0.8, 1),      # 蓝色 #3366CC
-    'secondary': (0.95, 0.95, 0.98, 1),  # 浅灰蓝背景
-    'accent': (0.98, 0.73, 0.24, 1),     # 金色 #F7BB3D
-    'text_dark': (0.13, 0.13, 0.13, 1),  # 深灰文字
-    'text_light': (0.4, 0.4, 0.4, 1),    # 浅灰文字
+    'primary': (0.2, 0.4, 0.8, 1),
+    'secondary': (0.95, 0.95, 0.98, 1),
+    'accent': (0.98, 0.73, 0.24, 1),
+    'text_dark': (0.13, 0.13, 0.13, 1),
+    'text_light': (0.4, 0.4, 0.4, 1),
     'white': (1, 1, 1, 1),
-    'success': (0.3, 0.69, 0.31, 1),     # 绿色
-    'danger': (0.87, 0.32, 0.32, 1),     # 红色
-    'background': (0.96, 0.96, 0.98, 1), # 页面背景
+    'success': (0.3, 0.69, 0.31, 1),
+    'danger': (0.87, 0.32, 0.32, 1),
 }
 
-# 数据文件路径
-PROGRAM_DIR = os.path.dirname(os.path.abspath(__file__)) if os.path.dirname(__file__) else os.getcwd()
-POETRY_FILE = os.path.join(PROGRAM_DIR, "poetry_data.json")
-RECORDS_FILE = os.path.join(PROGRAM_DIR, "recite_records.json")
-
-# 预置古诗文数据
+# ========== 预置古诗文数据 ==========
 BUILTIN_POETRY = {
-    "论语十二章": {"type": "文言文", "category": "必修", "author": "孔子及其弟子",
-        "content": "子曰：学而时习之，不亦说乎？有朋自远方来，不亦乐乎？人不知而不愠，不亦君子乎？\n\n曾子曰：吾日三省吾身：为人谋而不忠乎？与朋友交而不信乎？传不习乎？\n\n子曰：吾十有五而志于学，三十而立，四十而不惑，五十而知天命，六十而耳顺，七十而从心所欲，不逾矩。"},
-    "劝学": {"type": "文言文", "category": "必修", "author": "荀子",
-        "content": "君子曰：学不可以已。\n\n青，取之于蓝，而青于蓝；冰，水为之，而寒于水。\n\n故木受绳则直，金就砺则利，君子博学而日参省乎己，则知明而行无过矣。"},
-    "师说": {"type": "文言文", "category": "必修", "author": "韩愈",
-        "content": "古之学者必有师。师者，所以传道受业解惑也。\n\n人非生而知之者，孰能无惑？惑而不从师，其为惑也，终不解矣。"},
-    "赤壁赋": {"type": "文言文", "category": "必修", "author": "苏轼",
-        "content": "壬戌之秋，七月既望，苏子与客泛舟游于赤壁之下。\n\n清风徐来，水波不兴。举酒属客，诵明月之诗，歌窈窕之章。"},
-    "念奴娇赤壁怀古": {"type": "诗词曲", "category": "必修", "author": "苏轼",
-        "content": "大江东去，浪淘尽，千古风流人物。\n\n故垒西边，人道是，三国周郎赤壁。"},
-    "登高": {"type": "诗词曲", "category": "必修", "author": "杜甫",
-        "content": "风急天高猿啸哀，渚清沙白鸟飞回。\n\n无边落木萧萧下，不尽长江滚滚来。"},
-    "虞美人": {"type": "诗词曲", "category": "必修", "author": "李煜",
-        "content": "春花秋月何时了？往事知多少。\n\n小楼昨夜又东风，故国不堪回首月明中。"},
-    "短歌行": {"type": "诗词曲", "category": "必修", "author": "曹操",
-        "content": "对酒当歌，人生几何！譬如朝露，去日苦多。\n\n青青子衿，悠悠我心。"},
+    "论语十二章": {
+        "type": "文言文", "category": "必修", "author": "孔子及其弟子",
+        "content": """子曰："学而时习之，不亦说乎？有朋自远方来，不亦乐乎？人不知而不愠，不亦君子乎？"
+子曰："温故而知新，可以为师矣。"
+子曰："学而不思则罔，思而不学则殆。"
+子曰："知之者不如好之者，好之者不如乐之者。"
+子曰："三人行，必有我师焉。择其善者而从之，其不善者而改之。"
+子曰："逝者如斯夫，不舍昼夜。"
+子曰："三军可夺帅也，匹夫不可夺志也。"
+曾子曰："吾日三省吾身：为人谋而不忠乎？与朋友交而不信乎？传不习乎？"
+""",
+        "key_points": ["学习态度", "学习方法", "修身养性"]
+    },
+    "劝学": {
+        "type": "文言文", "category": "必修", "author": "荀子",
+        "content": """君子曰：学不可以已。
+青，取之于蓝，而青于蓝；冰，水为之，而寒于水。
+故木受绳则直，金就砺则利，君子博学而日参省乎己，则知明而行无过矣。
+吾尝终日而思矣，不如须臾之所学也。
+假舆马者，非利足也，而致千里；假舟楫者，非能水也，而绝江河。
+君子生非异也，善假于物也。
+""",
+        "key_points": ["学习的重要性", "学习方法"]
+    },
+    "师说": {
+        "type": "文言文", "category": "必修", "author": "韩愈",
+        "content": """古之学者必有师。师者，所以传道受业解惑也。
+人非生而知之者，孰能无惑？惑而不从师，其为惑也，终不解矣。
+是故无贵无贱，无长无少，道之所存，师之所存也。
+""",
+        "key_points": ["从师学习的必要性", "择师标准"]
+    },
+    "静夜思": {
+        "type": "古诗", "category": "必修", "author": "李白",
+        "content": """床前明月光，疑是地上霜。
+举头望明月，低头思故乡。
+""",
+        "key_points": ["思乡之情"]
+    },
+    "登鹳雀楼": {
+        "type": "古诗", "category": "必修", "author": "王之涣",
+        "content": """白日依山尽，黄河入海流。
+欲穷千里目，更上一层楼。
+""",
+        "key_points": ["进取精神"]
+    }
 }
 
-
-class RoundedButton(Button):
-    """圆角按钮"""
-    def __init__(self, bg_color=COLORS['primary'], **kwargs):
-        self.bg_color = bg_color
-        super().__init__(**kwargs)
-        self.background_normal = ''
-        self.background_color = bg_color
-        self.color = COLORS['white']
-        self.font_size = '16sp'
-        self.bold = True
-
-
-class CardBox(BoxLayout):
-    """卡片容器"""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.padding = dp(15)
-        self.spacing = dp(10)
-        with self.canvas.before:
-            Color(*COLORS['white'])
-            self.rect = RoundedRectangle(size=self.size, pos=self.pos, radius=[dp(10)])
-        self.bind(size=self.update_rect, pos=self.update_rect)
-    
-    def update_rect(self, instance, value):
-        self.rect.pos = instance.pos
-        self.rect.size = instance.size
-
-
-class MainScreen(Screen):
-    """主界面"""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.poetry_data = {}
-        self.records = {}
-        self.current_poetry = None
-        self.load_data()
-        self.build_ui()
-    
-    def load_data(self):
-        self.poetry_data = BUILTIN_POETRY.copy()
-        if os.path.exists(POETRY_FILE):
-            try:
-                with open(POETRY_FILE, 'r', encoding='utf-8') as f:
-                    self.poetry_data.update(json.load(f))
-            except:
-                pass
-        if os.path.exists(RECORDS_FILE):
-            try:
-                with open(RECORDS_FILE, 'r', encoding='utf-8') as f:
-                    self.records = json.load(f)
-            except:
-                pass
-    
-    def save_data(self):
+# ========== 数据管理 ==========
+def get_data_dir():
+    if ANDROID_AVAILABLE:
         try:
-            with open(RECORDS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(self.records, f, ensure_ascii=False, indent=2)
+            context = PYTHON_ACTIVITY.mActivity or PYTHON_ACTIVITY
+            return context.getFilesDir().getPath()
         except:
             pass
+    return os.path.dirname(os.path.abspath(__file__)) if os.path.dirname(__file__) else os.getcwd()
+
+DATA_DIR = get_data_dir()
+
+def load_records():
+    try:
+        records_file = os.path.join(DATA_DIR, "recite_records.json")
+        if os.path.exists(records_file):
+            with open(records_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except:
+        pass
+    return {}
+
+def save_records(records):
+    try:
+        records_file = os.path.join(DATA_DIR, "recite_records.json")
+        with open(records_file, 'w', encoding='utf-8') as f:
+            json.dump(records, f, ensure_ascii=False, indent=2)
+    except:
+        pass
+
+# ========== 美化按钮 ==========
+class RoundedButton(Button):
+    def __init__(self, **kwargs):
+        self.bg_color = kwargs.pop('bg_color', COLORS['primary'])
+        super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_color = self.bg_color
+        self.color = COLORS['white']
+        self.font_size = '16sp'
+
+# ========== 主界面 ==========
+class MainScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.poetry_data = BUILTIN_POETRY
+        self.records = load_records()
+        self.current_poetry = None
+        self._popup = None
+        self._records_popup = None
+        self.build_ui()
     
     def build_ui(self):
-        # 主布局
-        main_layout = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(15))
+        layout = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(10))
         
-        # 顶部标题卡片
-        title_card = CardBox(orientation='vertical', size_hint_y=0.18)
-        title = Label(
-            text='[size=22][b]古诗文背诵检测[/b][/size]\n[size=12]统编版高中语文72篇[/size]',
-            markup=True,
-            color=COLORS['text_dark'],
-            halign='center'
-        )
-        title_card.add_widget(title)
-        main_layout.add_widget(title_card)
+        layout.add_widget(Label(text='高中古诗文背诵检测', font_size='24sp', color=COLORS['primary'], size_hint_y=0.1, bold=True))
         
-        # 分类按钮区
-        cat_layout = BoxLayout(size_hint_y=0.1, spacing=dp(8))
-        categories = [('必修', COLORS['primary']), ('选修', (0.3, 0.6, 0.4, 1)), 
-                      ('个人新增', (0.6, 0.4, 0.6, 1)), ('PDF', (0.8, 0.5, 0.2, 1))]
-        for cat, color in categories:
-            btn = RoundedButton(text=cat, bg_color=color, font_size='14sp')
-            btn.bind(on_press=lambda x, c=cat: self.show_category(c))
-            cat_layout.add_widget(btn)
-        main_layout.add_widget(cat_layout)
+        self.category_btns = BoxLayout(size_hint_y=0.08, spacing=dp(5))
+        for cat in ['全部', '文言文', '古诗']:
+            btn = RoundedButton(text=cat, bg_color=COLORS['primary'] if cat == '全部' else (0.6, 0.6, 0.6, 1))
+            btn.bind(on_press=lambda x, c=cat: self.filter_category(c))
+            self.category_btns.add_widget(btn)
+        layout.add_widget(self.category_btns)
         
-        # 内容区
-        content_card = CardBox(size_hint_y=0.52)
-        self.content_label = Label(
-            text='[size=16]请选择分类查看古诗文[/size]\n\n[size=14]点击下方按钮开始检测[/size]',
-            markup=True,
-            color=COLORS['text_dark'],
-            halign='center',
-            valign='middle'
-        )
-        self.content_label.bind(texture_size=self.content_label.setter('size'))
-        content_card.add_widget(self.content_label)
-        main_layout.add_widget(content_card)
+        scroll = ScrollView(size_hint_y=0.72)
+        self.list_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(8))
+        self.list_layout.bind(minimum_height=self.list_layout.setter('height'))
+        scroll.add_widget(self.list_layout)
+        layout.add_widget(scroll)
         
-        # 底部按钮
-        btn_layout = BoxLayout(size_hint_y=0.12, spacing=dp(15))
-        btn1 = RoundedButton(text='填空检测', bg_color=COLORS['primary'])
-        btn1.bind(on_press=self.start_fill_test)
-        btn2 = RoundedButton(text='背诵记录', bg_color=(0.4, 0.4, 0.45, 1))
+        bottom = BoxLayout(size_hint_y=0.1, spacing=dp(10))
+        btn1 = RoundedButton(text='文言文PDF', bg_color=COLORS['accent'])
+        btn1.color = COLORS['text_dark']
+        btn1.bind(on_press=self.open_pdf)
+        bottom.add_widget(btn1)
+        btn2 = RoundedButton(text='查看记录', bg_color=(0.5, 0.5, 0.5, 1))
         btn2.bind(on_press=self.show_records)
-        btn_layout.add_widget(btn1)
-        btn_layout.add_widget(btn2)
-        main_layout.add_widget(btn_layout)
+        bottom.add_widget(btn2)
+        layout.add_widget(bottom)
         
-        self.add_widget(main_layout)
+        self.add_widget(layout)
+        self.filter_category('全部')
     
-    def show_category(self, category):
-        if category == 'PDF':
-            if self.open_pdf():
-                return
-            self.content_label.text = '[size=14][color=F44336]无法打开PDF[/color][/size]\n\n请安装PDF阅读器'
-            return
+    def filter_category(self, category):
+        for i, btn in enumerate(self.category_btns.children):
+            cats = ['古诗', '文言文', '全部']
+            btn.bg_color = COLORS['primary'] if cats[i] == category else (0.6, 0.6, 0.6, 1)
+            btn.background_color = btn.bg_color
         
-        items = [(n, d) for n, d in self.poetry_data.items() if d.get('category') == category]
-        if not items:
-            self.content_label.text = f'[size=16]{category}分类暂无内容[/size]'
-            return
+        self.list_layout.clear_widgets()
         
-        text = f'[size=18][b]{category}[/b][/size]\n\n'
+        if category == '全部':
+            items = list(self.poetry_data.items())
+        else:
+            items = [(n, d) for n, d in self.poetry_data.items() if d.get('type') == category]
+        
         for name, data in items:
-            t = data.get('type', '文言文')
-            text += f'[color=3366CC]•[/color] {name} [size=12]({t})[/size]\n'
-        self.content_label.text = text
+            box = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(50), spacing=dp(5))
+            info = BoxLayout(orientation='vertical')
+            info.add_widget(Label(text=name, color=COLORS['text_dark'], font_size='16sp', size_hint_y=0.6))
+            info.add_widget(Label(text=f"{data.get('author', '')} · {data.get('category', '')}", color=COLORS['text_light'], font_size='12sp', size_hint_y=0.4))
+            box.add_widget(info)
+            btn = RoundedButton(text='背诵', bg_color=COLORS['success'], size_hint_x=0.3)
+            btn.bind(on_press=lambda x, n=name: self.select_poetry(n))
+            box.add_widget(btn)
+            self.list_layout.add_widget(box)
     
-    def open_pdf(self):
-        if not ANDROID_AVAILABLE:
-            return False
-        try:
-            pdf_path = os.path.join(PROGRAM_DIR, '高中文言文基础知识点全解读.pdf')
-            if not os.path.exists(pdf_path):
-                return False
-            pdf_file = File(pdf_path)
-            context = PYTHON_ACTIVITY.mActivity
-            intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(pdf_file), 'application/pdf')
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-            return True
-        except:
-            return False
-    
-    def start_fill_test(self, instance):
-        content = BoxLayout(orientation='vertical', spacing=dp(10))
+    def select_poetry(self, name):
+        self.current_poetry = name
+        data = self.poetry_data.get(name, {})
+        content = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
+        
         scroll = ScrollView()
-        list_layout = BoxLayout(orientation='vertical', spacing=dp(8), size_hint_y=None)
-        list_layout.bind(minimum_height=list_layout.setter('height'))
-        
-        for name in sorted(self.poetry_data.keys()):
-            btn = RoundedButton(text=name, bg_color=COLORS['secondary'])
-            btn.color = COLORS['text_dark']
-            btn.bind(on_press=lambda x, n=name: self.do_fill_test(n))
-            list_layout.add_widget(btn)
-        
-        scroll.add_widget(list_layout)
+        text_label = Label(text=data.get('content', ''), color=COLORS['text_dark'], font_size='16sp', size_hint_y=None)
+        text_label.bind(texture_size=text_label.setter('size'))
+        scroll.add_widget(text_label)
         content.add_widget(scroll)
         
-        popup = Popup(title='选择诗文', content=content, size_hint=(0.9, 0.8),
-                      background=COLORS['white'], separator_color=COLORS['primary'])
+        btns = BoxLayout(size_hint_y=0.15, spacing=dp(5))
+        btn1 = RoundedButton(text='背诵检测', bg_color=COLORS['primary'])
+        btn1.bind(on_press=lambda x: self.start_test(name))
+        btns.add_widget(btn1)
+        btn2 = RoundedButton(text='关闭', bg_color=(0.6, 0.6, 0.6, 1))
+        btn2.bind(on_press=lambda x: self.close_popup())
+        btns.add_widget(btn2)
+        content.add_widget(btns)
         
-        for child in list_layout.children:
-            child.bind(on_press=lambda x: popup.dismiss())
-        
-        popup.open()
+        self._popup = Popup(title=name, content=content, size_hint=(0.9, 0.85))
+        self._popup.open()
     
-    def do_fill_test(self, poetry_name):
-        self.current_poetry = poetry_name
+    def close_popup(self):
+        if self._popup:
+            self._popup.dismiss()
+    
+    def start_test(self, name):
+        self.close_popup()
         self.manager.current = 'fill_test'
-        self.manager.get_screen('fill_test').setup_test(poetry_name)
+        self.manager.get_screen('fill_test').setup_test(name)
+    
+    def open_pdf(self, instance):
+        if ANDROID_AVAILABLE:
+            try:
+                pdf_path = os.path.join(DATA_DIR, "高中文言文基础知识点全解读.pdf")
+                if os.path.exists(pdf_path):
+                    uri = Uri.parse(f"file://{pdf_path}")
+                    intent = Intent(Intent.ACTION_VIEW)
+                    intent.setDataAndType(uri, "application/pdf")
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    PYTHON_ACTIVITY.mActivity.startActivity(intent)
+                    return
+            except:
+                pass
+        Popup(title='提示', content=Label(text='请在电脑端查看PDF文件', color=COLORS['text_dark']), size_hint=(0.7, 0.3)).open()
     
     def show_records(self, instance):
+        content = BoxLayout(orientation='vertical', padding=dp(10))
+        scroll = ScrollView()
+        layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(5))
+        layout.bind(minimum_height=layout.setter('height'))
+        
         if not self.records:
-            popup = Popup(title='背诵记录', content=Label(text='暂无记录', color=COLORS['text_dark']),
-                          size_hint=(0.8, 0.4), background=COLORS['white'])
-            popup.open()
-            return
+            layout.add_widget(Label(text='暂无背诵记录', color=COLORS['text_light'], size_hint_y=None, height=dp(40)))
+        else:
+            for name, recs in self.records.items():
+                for r in recs[-5:]:
+                    layout.add_widget(Label(text=f"{name} - {r.get('type', '')} - {r.get('score', 0):.0f}% - {r.get('time', '')}", color=COLORS['text_dark'], size_hint_y=None, height=dp(30), font_size='14sp'))
         
-        text = ''
-        for name, recs in self.records.items():
-            text += f'[b]{name}[/b]\n'
-            for r in recs[-3:]:
-                text += f"  {r['time']} | {r['score']:.0f}%\n"
-            text += '\n'
-        
-        popup = Popup(title='背诵记录', content=Label(text=text, markup=True, color=COLORS['text_dark']),
-                      size_hint=(0.9, 0.7), background=COLORS['white'])
-        popup.open()
+        scroll.add_widget(layout)
+        content.add_widget(scroll)
+        close_btn = RoundedButton(text='关闭', bg_color=(0.6, 0.6, 0.6, 1), size_hint_y=0.1)
+        close_btn.bind(on_press=lambda x: self.close_records_popup())
+        content.add_widget(close_btn)
+        self._records_popup = Popup(title='背诵记录', content=content, size_hint=(0.9, 0.8))
+        self._records_popup.open()
+    
+    def close_records_popup(self):
+        if self._records_popup:
+            self._records_popup.dismiss()
+    
+    def save_data(self):
+        save_records(self.records)
 
-
+# ========== 填空检测界面 ==========
 class FillTestScreen(Screen):
-    """填空检测界面"""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.answer_entries = []
         self.correct_answers = []
     
     def setup_test(self, poetry_name):
+        main_screen = self.manager.get_screen('main')
+        data = main_screen.poetry_data.get(poetry_name, {})
+        content = data.get('content', '')
+        
         self.clear_widgets()
         self.answer_entries = []
         self.correct_answers = []
         
-        main_screen = self.manager.get_screen('main')
-        content = main_screen.poetry_data.get(poetry_name, {}).get('content', '')
-        sentences = [s.strip() for s in content.split('\n') if s.strip() and len(s.strip()) > 2]
-        
         layout = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(10))
+        layout.add_widget(Label(text=f'填空检测：{poetry_name}', font_size='18sp', color=COLORS['primary'], size_hint_y=0.08))
         
-        # 标题
-        layout.add_widget(Label(
-            text=f'[size=20][b]{poetry_name}[/b][/size]',
-            markup=True, color=COLORS['text_dark'], size_hint_y=0.08
-        ))
-        
-        # 题目区
-        scroll = ScrollView(size_hint_y=0.72)
-        q_layout = BoxLayout(orientation='vertical', spacing=dp(12), size_hint_y=None)
+        scroll = ScrollView(size_hint_y=0.8)
+        q_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(10))
         q_layout.bind(minimum_height=q_layout.setter('height'))
+        
+        sentences = [s.strip() for s in content.split('\n') if s.strip() and len(s.strip()) > 4]
+        random.shuffle(sentences)
         
         for i, sentence in enumerate(sentences[:5]):
             mid = len(sentence) // 2
             is_front = random.choice([True, False])
-            
             if is_front:
                 blank = sentence[:mid]
                 show = sentence[mid:]
@@ -331,15 +322,9 @@ class FillTestScreen(Screen):
                 hint = f'{show} ___'
             
             q_box = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(80))
-            q_box.add_widget(Label(
-                text=f'第{i+1}句：{hint}',
-                color=COLORS['text_dark'], font_size='16sp', size_hint_y=0.4
-            ))
-            
-            entry = TextInput(hint_text='填写答案', font_size='16sp', size_hint_y=0.6,
-                             multiline=False, background_color=COLORS['secondary'])
+            q_box.add_widget(Label(text=f'第{i+1}句：{hint}', color=COLORS['text_dark'], font_size='16sp', size_hint_y=0.4))
+            entry = TextInput(hint_text='填写答案', font_size='16sp', size_hint_y=0.6, multiline=False, background_color=COLORS['secondary'])
             q_box.add_widget(entry)
-            
             self.answer_entries.append(entry)
             self.correct_answers.append(blank)
             q_layout.add_widget(q_box)
@@ -347,7 +332,6 @@ class FillTestScreen(Screen):
         scroll.add_widget(q_layout)
         layout.add_widget(scroll)
         
-        # 按钮
         btn_layout = BoxLayout(size_hint_y=0.12, spacing=dp(10))
         btn1 = RoundedButton(text='提交', bg_color=COLORS['primary'])
         btn1.bind(on_press=self.submit_answers)
@@ -366,11 +350,9 @@ class FillTestScreen(Screen):
     def submit_answers(self, instance):
         correct = 0
         total = len(self.answer_entries)
-        
         for entry, answer in zip(self.answer_entries, self.correct_answers):
             user = entry.text.strip().replace('，', '').replace('。', '').replace(' ', '')
             ans = answer.replace('，', '').replace('。', '').replace(' ', '')
-            
             if user == ans:
                 correct += 1
                 entry.background_color = COLORS['success']
@@ -378,21 +360,13 @@ class FillTestScreen(Screen):
                 entry.background_color = COLORS['danger']
         
         score = (correct / total * 100) if total > 0 else 0
-        
         main_screen = self.manager.get_screen('main')
         name = main_screen.current_poetry
         if name not in main_screen.records:
             main_screen.records[name] = []
-        main_screen.records[name].append({
-            'type': '填空检测',
-            'score': score,
-            'time': datetime.now().strftime('%m-%d %H:%M')
-        })
+        main_screen.records[name].append({'type': '填空检测', 'score': score, 'time': datetime.now().strftime('%m-%d %H:%M')})
         main_screen.save_data()
-        
-        Popup(title='检测结果', content=Label(text=f'得分：{score:.0f}%\n正确：{correct}/{total}',
-              color=COLORS['text_dark'], font_size='20sp'), size_hint=(0.7, 0.4),
-              background=COLORS['white']).open()
+        Popup(title='检测结果', content=Label(text=f'得分：{score:.0f}%\n正确：{correct}/{total}', color=COLORS['text_dark'], font_size='20sp'), size_hint=(0.7, 0.4)).open()
     
     def show_answers(self, instance):
         for entry, answer in zip(self.answer_entries, self.correct_answers):
@@ -402,7 +376,7 @@ class FillTestScreen(Screen):
     def go_back(self, instance):
         self.manager.current = 'main'
 
-
+# ========== 应用入口 ==========
 class PoetryApp(App):
     def build(self):
         sm = ScreenManager()
@@ -411,8 +385,10 @@ class PoetryApp(App):
         return sm
     
     def on_stop(self):
-        self.root.get_screen('main').save_data()
-
+        try:
+            self.root.get_screen('main').save_data()
+        except:
+            pass
 
 if __name__ == '__main__':
     PoetryApp().run()
