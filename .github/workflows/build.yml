@@ -1,4 +1,5 @@
 name: Build Android APK
+
 on:
   push:
     branches: [ main ]
@@ -7,13 +8,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: kivy/buildozer:latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Build APK
-        run: yes | buildozer android debug
+      - uses: actions/checkout@v3
+      
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          workdir: .
+          buildozer_version: stable
+      
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: poetry-app
-          path: bin/*.apk
+          path: ${{ steps.buildozer.outputs.filename }}
