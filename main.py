@@ -45,6 +45,29 @@ COLORS = {
     'white': (1, 1, 1, 1),
 }
 
+# ========== 数字转中文 ==========
+NUM_CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+
+def num_to_cn(n):
+    """将数字转为中文"""
+    if n < 0:
+        return str(n)
+    elif n <= 10:
+        return NUM_CN[n]
+    elif n < 20:
+        return '十' + (NUM_CN[n - 10] if n > 10 else '')
+    elif n < 100:
+        tens = n // 10
+        ones = n % 10
+        result = NUM_CN[tens] + '十'
+        if ones > 0:
+            result += NUM_CN[ones]
+        return result
+    elif n == 100:
+        return '一百'
+    else:
+        return str(int(n))
+
 # ========== 获取字体 ==========
 def get_font():
     font = resource_find('DroidSansFallback.ttf')
@@ -1262,7 +1285,7 @@ class MainScreen(Screen):
                 for r in recs[-5:]:
                     score_val = int(r.get('score', 0))
                     score_cn = num_to_cn(score_val) if score_val <= 100 else str(score_val)
-                    text = f"{name} - {score_cn}分 - {r.get('time', '')}"
+                    text = f"{name}，{score_cn}分，{r.get('time', '')}"
                     layout.add_widget(Label(
                         text=text,
                         font_name=FONT,
@@ -1303,25 +1326,6 @@ class MainScreen(Screen):
     def save_data(self):
         save_records(self.records)
 
-# 数字转中文
-NUM_CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
-
-def num_to_cn(n):
-    """将数字转为中文"""
-    if n <= 10:
-        return NUM_CN[n-1] if n >= 1 else '零'
-    elif n < 20:
-        return '十' + (NUM_CN[n-11] if n > 10 else '')
-    elif n < 100:
-        tens = n // 10
-        ones = n % 10
-        result = NUM_CN[tens-1] + '十'
-        if ones > 0:
-            result += NUM_CN[ones-1]
-        return result
-    else:
-        return str(int(n))
-
 # ========== 填空检测界面 ==========
 class FillTestScreen(Screen):
     def __init__(self, **kwargs):
@@ -1361,15 +1365,22 @@ class FillTestScreen(Screen):
             if is_front:
                 blank = sentence[:mid]
                 show = sentence[mid:]
-                hint = f'______（需填{NUM_CN[i]}到{NUM_CN[min(i+1, 9)]}字） {show}'
             else:
                 show = sentence[:mid]
                 blank = sentence[mid:]
-                hint = f'{show} ______（需填{NUM_CN[i]}到{NUM_CN[min(i+1, 9)]}字）'
+            
+            # 计算实际需要填写的字数
+            blank_len = len(blank)
+            blank_cn = num_to_cn(blank_len)
+            
+            if is_front:
+                hint = f'______（需填{blank_cn}字） {show}'
+            else:
+                hint = f'{show} ______（需填{blank_cn}字）'
             
             q_box = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(120))
             q_label = Label(
-                text=f'第{NUM_CN[i]}题：{hint}',
+                text=f'第{NUM_CN[i+1]}题：{hint}',
                 font_name=FONT,
                 color=COLORS['text_dark'],
                 font_size='15sp',
@@ -1454,7 +1465,7 @@ class FillTestScreen(Screen):
         main_screen.records[name].append({
             'type': '填空检测',
             'score': score,
-            'time': datetime.now().strftime('%m-%d %H:%M')
+            'time': f"{num_to_cn(datetime.now().month)}月{num_to_cn(datetime.now().day)}日"
         })
         main_screen.save_data()
         
@@ -1466,7 +1477,7 @@ class FillTestScreen(Screen):
         
         content_layout = BoxLayout(orientation='vertical', padding=dp(20))
         score_label = Label(
-            text=f'得分：{score_cn}分\n正确：{correct_cn}题 / 共{total_cn}题',
+            text=f'得分：{score_cn}分\n正确：{correct_cn}题，共{total_cn}题',
             font_name=FONT,
             color=COLORS['text_dark'],
             font_size='22sp',
@@ -1609,7 +1620,7 @@ class FullTestScreen(Screen):
         main_screen.records[self.poetry_name].append({
             'type': '全文背诵',
             'score': similarity,
-            'time': datetime.now().strftime('%m-%d %H:%M')
+            'time': f"{num_to_cn(datetime.now().month)}月{num_to_cn(datetime.now().day)}日"
         })
         main_screen.save_data()
         
@@ -1621,7 +1632,7 @@ class FullTestScreen(Screen):
         
         content_layout = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(10))
         
-        score_text = f'相似度：{score_cn}%\n正确字数：{correct_cn}字 / 共{total_cn}字'
+        score_text = f'相似度：{score_cn}%\n正确字数：{correct_cn}字，共{total_cn}字'
         if similarity >= 95:
             score_text += '\n\n太棒了！背诵非常准确！'
         elif similarity >= 80:
