@@ -1005,6 +1005,42 @@ def get_data_dir():
             pass
     return os.path.dirname(os.path.abspath(__file__)) if os.path.dirname(__file__) else os.getcwd()
 
+def copy_pdf_from_assets():
+    """从assets复制PDF文件到可访问目录"""
+    if not ANDROID:
+        return None
+    
+    try:
+        pdf_name = "高中文言文基础知识点全解读.pdf"
+        dest_path = os.path.join(get_data_dir(), pdf_name)
+        
+        # 如果已存在则直接返回
+        if os.path.exists(dest_path):
+            return dest_path
+        
+        # 从assets复制
+        AssetManager = autoclass('android.content.res.AssetManager')
+        InputStream = autoclass('java.io.FileInputStream')
+        FileOutputStream = autoclass('java.io.FileOutputStream')
+        
+        assets = PYTHON_ACTIVITY.mActivity.getAssets()
+        input_stream = assets.open(pdf_name)
+        output_stream = FileOutputStream(dest_path)
+        
+        buffer = bytearray(1024)
+        while True:
+            length = input_stream.read(buffer)
+            if length <= 0:
+                break
+            output_stream.write(buffer, 0, length)
+        
+        input_stream.close()
+        output_stream.close()
+        
+        return dest_path
+    except Exception as e:
+        return None
+
 DATA_DIR = get_data_dir()
 RECORDS_FILE = os.path.join(DATA_DIR, "recite_records.json")
 
@@ -1084,7 +1120,7 @@ class MainScreen(Screen):
         bottom = BoxLayout(size_hint_y=0.1, spacing=dp(10))
         
         btn_pdf = Button(
-            text='文言文PDF',
+            text='文言文资料',
             font_name=FONT,
             background_color=COLORS['accent']
         )
@@ -1241,23 +1277,62 @@ class MainScreen(Screen):
         """打开PDF文件"""
         if ANDROID:
             try:
-                pdf_path = os.path.join(DATA_DIR, "高中文言文基础知识点全解读.pdf")
-                if os.path.exists(pdf_path):
-                    uri = Uri.parse(f"file://{pdf_path}")
+                # 先复制PDF到可访问目录
+                pdf_path = copy_pdf_from_assets()
+                if not pdf_path:
+                    Popup(
+                        title='提示',
+                        title_font=FONT,
+                        title_color=COLORS['text_dark'],
+                        content=Label(
+                            text='文档文件不存在',
+                            font_name=FONT,
+                            color=COLORS['text_dark']
+                        ),
+                        size_hint=(0.6, 0.25),
+                        background='',
+                        background_color=COLORS['white']
+                    ).open()
+                    return
+                
+                # 方法一：使用选择器让用户选择应用
+                try:
+                    File = autoclass('java.io.File')
+                    file = File(pdf_path)
+                    uri = Uri.fromFile(file)
+                    intent = Intent(Intent.ACTION_VIEW)
+                    intent.setDataAndType(uri, "application/pdf")
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    chooser = Intent.createChooser(intent, "选择应用打开文档")
+                    PYTHON_ACTIVITY.mActivity.startActivity(chooser)
+                    return
+                except Exception as e:
+                    pass
+                
+                # 方法二：直接打开
+                try:
+                    File = autoclass('java.io.File')
+                    file = File(pdf_path)
+                    uri = Uri.fromFile(file)
                     intent = Intent(Intent.ACTION_VIEW)
                     intent.setDataAndType(uri, "application/pdf")
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     PYTHON_ACTIVITY.mActivity.startActivity(intent)
                     return
-            except:
+                except:
+                    pass
+                    
+            except Exception as e:
                 pass
         
         # 无法打开PDF时的提示
         Popup(
             title='提示',
             title_font=FONT,
+            title_color=COLORS['text_dark'],
             content=Label(
-                text='请在电脑端查看PDF文件\n或安装PDF阅读器',
+                text='请在电脑端查看文档\n或安装文档阅读器',
                 font_name=FONT,
                 color=COLORS['text_dark']
             ),
