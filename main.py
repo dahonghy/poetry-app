@@ -1071,22 +1071,34 @@ class MainScreen(Screen):
             font_size='18sp',
             size_hint_y=None,
             halign='left',
-            valign='top'
+            valign='top',
+            text_size=(None, None)
         )
-        text_label.bind(texture_size=text_label.setter('size'))
+        text_label.bind(
+            texture_size=text_label.setter('size'),
+            width=lambda *args: text_label.setter('text_size')(text_label, (text_label.width, None))
+        )
         scroll.add_widget(text_label)
         content.add_widget(scroll)
         
         # 按钮
-        btns = BoxLayout(size_hint_y=0.15, spacing=dp(10))
+        btns = BoxLayout(size_hint_y=0.15, spacing=dp(8))
         
-        btn_test = Button(
-            text='背诵检测',
+        btn_fill = Button(
+            text='填空检测',
             font_name=FONT,
             background_color=COLORS['primary']
         )
-        btn_test.bind(on_press=lambda x: self.start_test(name))
-        btns.add_widget(btn_test)
+        btn_fill.bind(on_press=lambda x: self.start_fill_test(name))
+        btns.add_widget(btn_fill)
+        
+        btn_full = Button(
+            text='全文背诵',
+            font_name=FONT,
+            background_color=(0.3, 0.7, 0.4, 1)
+        )
+        btn_full.bind(on_press=lambda x: self.start_full_test(name))
+        btns.add_widget(btn_full)
         
         btn_close = Button(
             text='关闭',
@@ -1108,11 +1120,17 @@ class MainScreen(Screen):
         )
         self._popup.open()
     
-    def start_test(self, name):
+    def start_fill_test(self, name):
         if self._popup:
             self._popup.dismiss()
         self.manager.current = 'fill_test'
         self.manager.get_screen('fill_test').setup_test(name)
+    
+    def start_full_test(self, name):
+        if self._popup:
+            self._popup.dismiss()
+        self.manager.current = 'full_test'
+        self.manager.get_screen('full_test').setup_test(name)
     
     def open_pdf(self, instance):
         """打开PDF文件"""
@@ -1239,20 +1257,29 @@ class FillTestScreen(Screen):
                 blank = sentence[mid:]
                 hint = f'{show} ___'
             
-            q_box = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(80))
-            q_box.add_widget(Label(
+            q_box = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(100))
+            q_label = Label(
                 text=f'第{i+1}句：{hint}',
                 font_name=FONT,
                 color=COLORS['text_dark'],
                 font_size='16sp',
-                size_hint_y=0.4
-            ))
+                size_hint_y=None,
+                height=dp(50),
+                halign='left',
+                valign='middle',
+                text_size=(None, None)
+            )
+            q_label.bind(
+                width=lambda ins, w: setattr(ins, 'text_size', (w, None))
+            )
+            q_box.add_widget(q_label)
             
             entry = TextInput(
                 hint_text='填写答案',
                 font_name=FONT,
                 font_size='16sp',
-                size_hint_y=0.6,
+                size_hint_y=None,
+                height=dp(45),
                 multiline=False,
                 background_color=COLORS['secondary']
             )
@@ -1321,16 +1348,24 @@ class FillTestScreen(Screen):
         })
         main_screen.save_data()
         
+        # 创建得分显示内容
+        content_layout = BoxLayout(orientation='vertical', padding=dp(20))
+        score_label = Label(
+            text=f'得分：{score:.0f}分\n正确：{correct}题 / 共{total}题',
+            font_name=FONT,
+            color=COLORS['text_dark'],
+            font_size='22sp',
+            halign='center',
+            valign='middle'
+        )
+        content_layout.add_widget(score_label)
+        
         Popup(
             title='检测结果',
             title_font=FONT,
-            content=Label(
-                text=f'得分：{score:.0f}%\n正确：{correct}/{total}',
-                font_name=FONT,
-                color=COLORS['text_dark'],
-                font_size='20sp'
-            ),
-            size_hint=(0.7, 0.4),
+            title_color=COLORS['text_dark'],
+            content=content_layout,
+            size_hint=(0.75, 0.4),
             background='',
             background_color=COLORS['white']
         ).open()
@@ -1343,12 +1378,209 @@ class FillTestScreen(Screen):
     def go_back(self, instance):
         self.manager.current = 'main'
 
+# ========== 全文背诵检测界面 ==========
+class FullTestScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.poetry_name = ''
+        self.original_content = ''
+    
+    def setup_test(self, poetry_name):
+        data = BUILTIN_POETRY.get(poetry_name, {})
+        self.poetry_name = poetry_name
+        self.original_content = data.get('content', '')
+        
+        self.clear_widgets()
+        
+        layout = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(10))
+        
+        # 标题
+        layout.add_widget(Label(
+            text=f'全文背诵：{poetry_name}',
+            font_name=FONT,
+            font_size='18sp',
+            color=COLORS['primary'],
+            size_hint_y=0.08
+        ))
+        
+        # 提示
+        layout.add_widget(Label(
+            text='请在下方输入全文内容：',
+            font_name=FONT,
+            font_size='14sp',
+            color=COLORS['text_light'],
+            size_hint_y=0.05,
+            halign='left'
+        ))
+        
+        # 文本输入框
+        self.text_input = TextInput(
+            hint_text='在此输入全文...',
+            font_name=FONT,
+            font_size='16sp',
+            size_hint_y=0.65,
+            multiline=True,
+            background_color=COLORS['secondary'],
+            foreground_color=COLORS['text_dark']
+        )
+        layout.add_widget(self.text_input)
+        
+        # 按钮
+        btn_layout = BoxLayout(size_hint_y=0.12, spacing=dp(10))
+        
+        btn_submit = Button(
+            text='提交检测',
+            font_name=FONT,
+            background_color=COLORS['primary']
+        )
+        btn_submit.bind(on_press=self.submit_full)
+        btn_layout.add_widget(btn_submit)
+        
+        btn_show = Button(
+            text='查看原文',
+            font_name=FONT,
+            background_color=COLORS['accent']
+        )
+        btn_show.bind(on_press=self.show_original)
+        btn_layout.add_widget(btn_show)
+        
+        btn_back = Button(
+            text='返回',
+            font_name=FONT,
+            background_color=(0.6, 0.6, 0.6, 1)
+        )
+        btn_back.bind(on_press=self.go_back)
+        btn_layout.add_widget(btn_back)
+        
+        layout.add_widget(btn_layout)
+        self.add_widget(layout)
+    
+    def submit_full(self, instance):
+        user_text = self.text_input.text.strip()
+        original = self.original_content.strip()
+        
+        if not user_text:
+            Popup(
+                title='提示',
+                title_font=FONT,
+                title_color=COLORS['text_dark'],
+                content=Label(
+                    text='请输入全文内容',
+                    font_name=FONT,
+                    color=COLORS['text_dark']
+                ),
+                size_hint=(0.6, 0.25),
+                background='',
+                background_color=COLORS['white']
+            ).open()
+            return
+        
+        # 统计
+        original_clean = original.replace('，', '').replace('。', '').replace('？', '').replace('！', '').replace('、', '').replace(' ', '').replace('\n', '')
+        user_clean = user_text.replace('，', '').replace('。', '').replace('？', '').replace('！', '').replace('、', '').replace(' ', '').replace('\n', '')
+        
+        # 计算相似度
+        import difflib
+        similarity = difflib.SequenceMatcher(None, original_clean, user_clean).ratio() * 100
+        
+        # 统计正确字数
+        correct_chars = sum(1 for a, b in zip(original_clean, user_clean) if a == b)
+        total_chars = len(original_clean)
+        
+        # 保存记录
+        main_screen = self.manager.get_screen('main')
+        if self.poetry_name not in main_screen.records:
+            main_screen.records[self.poetry_name] = []
+        main_screen.records[self.poetry_name].append({
+            'type': '全文背诵',
+            'score': similarity,
+            'time': datetime.now().strftime('%m-%d %H:%M')
+        })
+        main_screen.save_data()
+        
+        # 显示结果
+        content_layout = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(10))
+        
+        score_text = f'相似度：{similarity:.1f}%\n正确字数：{correct_chars} / {total_chars}'
+        if similarity >= 95:
+            score_text += '\n\n太棒了！背诵非常准确！'
+        elif similarity >= 80:
+            score_text += '\n\n不错！继续加油！'
+        elif similarity >= 60:
+            score_text += '\n\n还需努力，多读几遍！'
+        else:
+            score_text += '\n\n加油！建议先熟读原文。'
+        
+        content_layout.add_widget(Label(
+            text=score_text,
+            font_name=FONT,
+            color=COLORS['text_dark'],
+            font_size='20sp',
+            halign='center',
+            valign='middle'
+        ))
+        
+        Popup(
+            title='背诵结果',
+            title_font=FONT,
+            title_color=COLORS['text_dark'],
+            content=content_layout,
+            size_hint=(0.8, 0.5),
+            background='',
+            background_color=COLORS['white']
+        ).open()
+    
+    def show_original(self, instance):
+        content_layout = BoxLayout(orientation='vertical', padding=dp(10))
+        scroll = ScrollView()
+        
+        text_label = Label(
+            text=self.original_content,
+            font_name=FONT,
+            color=COLORS['text_dark'],
+            font_size='16sp',
+            size_hint_y=None,
+            halign='left',
+            valign='top',
+            text_size=(None, None)
+        )
+        text_label.bind(
+            texture_size=text_label.setter('size'),
+            width=lambda ins, w: setattr(ins, 'text_size', (w, None))
+        )
+        scroll.add_widget(text_label)
+        content_layout.add_widget(scroll)
+        
+        btn_close = Button(
+            text='关闭',
+            font_name=FONT,
+            size_hint_y=0.15,
+            background_color=(0.6, 0.6, 0.6, 1)
+        )
+        btn_close.bind(on_press=lambda x: popup.dismiss())
+        content_layout.add_widget(btn_close)
+        
+        popup = Popup(
+            title='原文',
+            title_font=FONT,
+            title_color=COLORS['text_dark'],
+            content=content_layout,
+            size_hint=(0.9, 0.85),
+            background='',
+            background_color=COLORS['white']
+        )
+        popup.open()
+    
+    def go_back(self, instance):
+        self.manager.current = 'main'
+
 # ========== 应用入口 ==========
 class PoetryApp(App):
     def build(self):
         sm = ScreenManager()
         sm.add_widget(MainScreen(name='main'))
         sm.add_widget(FillTestScreen(name='fill_test'))
+        sm.add_widget(FullTestScreen(name='full_test'))
         return sm
     
     def on_stop(self):
