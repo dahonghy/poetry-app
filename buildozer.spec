@@ -39,8 +39,11 @@ orientation = portrait
 # 全屏
 fullscreen = 0
 
+# 图标
+# icon.filename = icon.png
+
 # 权限
-android.permissions = INTERNET,RECORD_AUDIO
+android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 
 # ABI
 android.archs = arm64-v8a,armeabi-v7a
