@@ -1022,45 +1022,56 @@ def get_data_dir():
     return os.path.dirname(os.path.abspath(__file__)) if os.path.dirname(__file__) else os.getcwd()
 
 def find_pdf():
-    """查找PDF文件路径"""
-    # 方法1：使用Kivy resource_find
-    pdf_path = resource_find('gaozhong_wenyanwen.pdf')
-    if pdf_path and os.path.exists(pdf_path):
-        return pdf_path
+    """查找或复制PDF文件到可访问目录"""
+    pdf_filename = 'gaozhong_wenyanwen.pdf'
     
-    # 方法2：直接检查当前目录
-    if os.path.exists('gaozhong_wenyanwen.pdf'):
-        return os.path.abspath('gaozhong_wenyanwen.pdf')
-    
-    # 方法3：检查数据目录
-    data_dir = get_data_dir()
-    dest_path = os.path.join(data_dir, 'gaozhong_wenyanwen.pdf')
-    if os.path.exists(dest_path):
-        return dest_path
-    
-    # 方法4：Android平台从assets复制
     if ANDROID:
         try:
-            assets = PYTHON_ACTIVITY.mActivity.getAssets()
-            input_stream = assets.open('gaozhong_wenyanwen.pdf')
+            # 目标目录：外部存储的Download目录
+            Environment = autoclass('android.os.Environment')
+            download_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()
+            dest_path = os.path.join(download_dir, pdf_filename)
             
-            FileOutputStream = autoclass('java.io.FileOutputStream')
-            output_stream = FileOutputStream(dest_path)
-            
-            buffer = bytearray(4096)
-            while True:
-                length = input_stream.read(buffer)
-                if length <= 0:
-                    break
-                output_stream.write(buffer, 0, length)
-            
-            input_stream.close()
-            output_stream.close()
-            
+            # 如果已存在，直接返回
             if os.path.exists(dest_path):
                 return dest_path
-        except:
+            
+            # 从assets复制到Download目录
+            try:
+                assets = PYTHON_ACTIVITY.mActivity.getAssets()
+                input_stream = assets.open(pdf_filename)
+                
+                FileOutputStream = autoclass('java.io.FileOutputStream')
+                output_stream = FileOutputStream(dest_path)
+                
+                buffer = bytearray(8192)
+                while True:
+                    length = input_stream.read(buffer)
+                    if length <= 0:
+                        break
+                    output_stream.write(buffer, 0, length)
+                
+                input_stream.close()
+                output_stream.close()
+                
+                if os.path.exists(dest_path):
+                    return dest_path
+            except Exception as e:
+                # 如果assets找不到，尝试应用私有目录
+                pass
+            
+            # 备用方案：应用私有目录
+            data_dir = get_data_dir()
+            dest_path = os.path.join(data_dir, pdf_filename)
+            if os.path.exists(dest_path):
+                return dest_path
+                
+        except Exception as e:
             pass
+    else:
+        # 非Android环境
+        if os.path.exists(pdf_filename):
+            return os.path.abspath(pdf_filename)
     
     return None
 
