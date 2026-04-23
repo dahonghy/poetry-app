@@ -1021,53 +1021,48 @@ def get_data_dir():
             pass
     return os.path.dirname(os.path.abspath(__file__)) if os.path.dirname(__file__) else os.getcwd()
 
-def copy_pdf_from_assets():
-    """从assets复制PDF文件到可访问目录"""
-    if not ANDROID:
-        return None
+def find_pdf():
+    """查找PDF文件路径"""
+    # 方法1：使用Kivy resource_find
+    pdf_path = resource_find('gaozhong_wenyanwen.pdf')
+    if pdf_path and os.path.exists(pdf_path):
+        return pdf_path
     
-    try:
-        # 尝试不同的文件名
-        pdf_names = [
-            "高中文言文基础知识点全解读.pdf",
-            "gaozhong_wenyanwen.pdf"
-        ]
-        
-        dest_dir = get_data_dir()
-        
-        for pdf_name in pdf_names:
-            try:
-                dest_path = os.path.join(dest_dir, pdf_name)
-                
-                # 如果已存在则直接返回
-                if os.path.exists(dest_path):
-                    return dest_path
-                
-                # 从assets复制
-                assets = PYTHON_ACTIVITY.mActivity.getAssets()
-                input_stream = assets.open(pdf_name)
-                
-                FileOutputStream = autoclass('java.io.FileOutputStream')
-                output_stream = FileOutputStream(dest_path)
-                
-                buffer = bytearray(4096)
-                while True:
-                    length = input_stream.read(buffer)
-                    if length <= 0:
-                        break
-                    output_stream.write(buffer, 0, length)
-                
-                input_stream.close()
-                output_stream.close()
-                
-                if os.path.exists(dest_path):
-                    return dest_path
-            except:
-                continue
-        
-        return None
-    except:
-        return None
+    # 方法2：直接检查当前目录
+    if os.path.exists('gaozhong_wenyanwen.pdf'):
+        return os.path.abspath('gaozhong_wenyanwen.pdf')
+    
+    # 方法3：检查数据目录
+    data_dir = get_data_dir()
+    dest_path = os.path.join(data_dir, 'gaozhong_wenyanwen.pdf')
+    if os.path.exists(dest_path):
+        return dest_path
+    
+    # 方法4：Android平台从assets复制
+    if ANDROID:
+        try:
+            assets = PYTHON_ACTIVITY.mActivity.getAssets()
+            input_stream = assets.open('gaozhong_wenyanwen.pdf')
+            
+            FileOutputStream = autoclass('java.io.FileOutputStream')
+            output_stream = FileOutputStream(dest_path)
+            
+            buffer = bytearray(4096)
+            while True:
+                length = input_stream.read(buffer)
+                if length <= 0:
+                    break
+                output_stream.write(buffer, 0, length)
+            
+            input_stream.close()
+            output_stream.close()
+            
+            if os.path.exists(dest_path):
+                return dest_path
+        except:
+            pass
+    
+    return None
 
 DATA_DIR = get_data_dir()
 RECORDS_FILE = os.path.join(DATA_DIR, "recite_records.json")
@@ -1305,8 +1300,8 @@ class MainScreen(Screen):
         """打开PDF文件"""
         if ANDROID:
             try:
-                # 先复制PDF到可访问目录
-                pdf_path = copy_pdf_from_assets()
+                # 查找PDF文件路径
+                pdf_path = find_pdf()
                 if not pdf_path:
                     Popup(
                         title='提示',
