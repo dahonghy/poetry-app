@@ -1328,63 +1328,58 @@ class MainScreen(Screen):
     def open_pdf(self, instance):
         """打开PDF文件"""
         if ANDROID:
+            # 查找PDF文件路径
+            pdf_path = find_pdf()
+            if not pdf_path:
+                Popup(
+                    title='提示',
+                    title_font=FONT,
+                    title_color=COLORS['text_dark'],
+                    content=Label(
+                        text='文档文件不存在',
+                        font_name=FONT,
+                        color=COLORS['text_dark']
+                    ),
+                    size_hint=(0.6, 0.25),
+                    background='',
+                    background_color=COLORS['white']
+                ).open()
+                return
+            
             try:
-                # 查找PDF文件路径
-                pdf_path = find_pdf()
-                if not pdf_path:
-                    Popup(
-                        title='提示',
-                        title_font=FONT,
-                        title_color=COLORS['text_dark'],
-                        content=Label(
-                            text='文档文件不存在',
-                            font_name=FONT,
-                            color=COLORS['text_dark']
-                        ),
-                        size_hint=(0.6, 0.25),
-                        background='',
-                        background_color=COLORS['white']
-                    ).open()
-                    return
-                
-                # 方法一：使用选择器让用户选择应用
-                try:
-                    File = autoclass('java.io.File')
-                    file = File(pdf_path)
-                    uri = Uri.fromFile(file)
-                    intent = Intent(Intent.ACTION_VIEW)
-                    intent.setDataAndType(uri, "application/pdf")
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    chooser = Intent.createChooser(intent, "选择应用打开文档")
-                    PYTHON_ACTIVITY.mActivity.startActivity(chooser)
-                    return
-                except Exception as e:
-                    pass
-                
-                # 方法二：直接打开
-                try:
-                    File = autoclass('java.io.File')
-                    file = File(pdf_path)
-                    uri = Uri.fromFile(file)
-                    intent = Intent(Intent.ACTION_VIEW)
-                    intent.setDataAndType(uri, "application/pdf")
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    PYTHON_ACTIVITY.mActivity.startActivity(intent)
-                    return
-                except:
-                    pass
-                    
+                File = autoclass('java.io.File')
+                file = File(pdf_path)
+                uri = Uri.fromFile(file)
+                intent = Intent(Intent.ACTION_VIEW)
+                intent.setDataAndType(uri, "application/pdf")
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                PYTHON_ACTIVITY.mActivity.startActivity(intent)
+                return
             except Exception as e:
-                pass
+                # 显示具体错误信息
+                error_msg = str(e)[:50] if str(e) else '未知错误'
+                Popup(
+                    title='提示',
+                    title_font=FONT,
+                    title_color=COLORS['text_dark'],
+                    content=Label(
+                        text=f'打开失败: {error_msg}',
+                        font_name=FONT,
+                        color=COLORS['text_dark']
+                    ),
+                    size_hint=(0.8, 0.3),
+                    background='',
+                    background_color=COLORS['white']
+                ).open()
+                return
         
-        # 无法打开PDF时的提示
+        # 非Android平台的提示
         Popup(
             title='提示',
             title_font=FONT,
             title_color=COLORS['text_dark'],
             content=Label(
-                text='请在电脑端查看文档\n或安装文档阅读器',
+                text='请在电脑端查看文档',
                 font_name=FONT,
                 color=COLORS['text_dark']
             ),
