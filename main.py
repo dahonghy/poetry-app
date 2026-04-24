@@ -1326,7 +1326,7 @@ class MainScreen(Screen):
         self.manager.get_screen('full_test').setup_test(name)
     
     def open_pdf(self, instance):
-        """打开PDF文件"""
+        """打开PDF文件 - 兼容Android 4.0 ~ Android 14"""
         if ANDROID:
             # 查找PDF文件路径
             pdf_path = find_pdf()
@@ -1346,32 +1346,81 @@ class MainScreen(Screen):
                 ).open()
                 return
             
+            error_msg = None
+            
             try:
                 File = autoclass('java.io.File')
                 file = File(pdf_path)
-                uri = Uri.fromFile(file)
+                
+                # 方法1: 使用FileProvider (Android 7.0+, 推荐)
+                try:
+                    StrictMode = autoclass('android.os.StrictMode')
+                    StrictMode.disableDeathOnFileUriExposure()
+                except:
+                    pass
+                
+                uri = None
+                
+                # 尝试FileProvider方式
+                try:
+                    FileProvider = autoclass('androidx.core.content.FileProvider')
+                    authority = PYTHON_ACTIVITY.mActivity.getPackageName() + '.fileprovider'
+                    uri = FileProvider.getUriForFile(PYTHON_ACTIVITY.mActivity, authority, file)
+                except:
+                    try:
+                        FileProvider = autoclass('android.support.v4.content.FileProvider')
+                        authority = PYTHON_ACTIVITY.mActivity.getPackageName() + '.fileprovider'
+                        uri = FileProvider.getUriForFile(PYTHON_ACTIVITY.mActivity, authority, file)
+                    except:
+                        pass
+                
+                # 如果FileProvider失败，使用传统方式 (Android 4.x - 6.x)
+                if not uri:
+                    uri = Uri.fromFile(file)
+                
                 intent = Intent(Intent.ACTION_VIEW)
                 intent.setDataAndType(uri, "application/pdf")
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                PYTHON_ACTIVITY.mActivity.startActivity(intent)
+                
+                # 授予URI读取权限给所有可能的包
+                try:
+                    PackageManager = autoclass('android.content.pm.PackageManager')
+                    pm = PYTHON_ACTIVITY.mActivity.getPackageManager()
+                    activities = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                    for i in range(activities.size()):
+                        resolve_info = activities.get(i)
+                        package_name = resolve_info.activityInfo.packageName
+                        PYTHON_ACTIVITY.mActivity.grantUriPermission(
+                            package_name, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                except:
+                    pass
+                
+                # 使用选择器让用户选择应用
+                chooser = Intent.createChooser(intent, "选择应用打开文档")
+                PYTHON_ACTIVITY.mActivity.startActivity(chooser)
                 return
+                
             except Exception as e:
-                # 显示具体错误信息
-                error_msg = str(e)[:50] if str(e) else '未知错误'
-                Popup(
-                    title='提示',
-                    title_font=FONT,
-                    title_color=COLORS['text_dark'],
-                    content=Label(
-                        text=f'打开失败: {error_msg}',
-                        font_name=FONT,
-                        color=COLORS['text_dark']
-                    ),
-                    size_hint=(0.8, 0.3),
-                    background='',
-                    background_color=COLORS['white']
-                ).open()
-                return
+                error_msg = str(e)[:80] if str(e) else '未知错误'
+            
+            # 显示错误信息
+            Popup(
+                title='提示',
+                title_font=FONT,
+                title_color=COLORS['text_dark'],
+                content=Label(
+                    text=f'打开失败:\n{error_msg}' if error_msg else '打开失败',
+                    font_name=FONT,
+                    color=COLORS['text_dark'],
+                    font_size='14sp'
+                ),
+                size_hint=(0.85, 0.35),
+                background='',
+                background_color=COLORS['white']
+            ).open()
+            return
         
         # 非Android平台的提示
         Popup(
