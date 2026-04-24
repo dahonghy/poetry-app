@@ -1025,53 +1025,71 @@ def find_pdf():
     """查找或复制PDF文件到可访问目录"""
     pdf_filename = 'gaozhong_wenyanwen.pdf'
     
+    # 方法1：使用Kivy的resource_find（最可靠）
+    pdf_path = resource_find(pdf_filename)
+    if pdf_path and os.path.exists(pdf_path):
+        # 找到了，复制到Download目录供外部应用访问
+        if ANDROID:
+            try:
+                Environment = autoclass('android.os.Environment')
+                download_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()
+                dest_path = os.path.join(download_dir, pdf_filename)
+                
+                if not os.path.exists(dest_path):
+                    # 复制文件
+                    import shutil
+                    shutil.copy2(pdf_path, dest_path)
+                
+                if os.path.exists(dest_path):
+                    return dest_path
+            except:
+                pass
+        return pdf_path
+    
     if ANDROID:
         try:
-            # 目标目录：外部存储的Download目录
+            # 方法2：从assets复制
             Environment = autoclass('android.os.Environment')
             download_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()
             dest_path = os.path.join(download_dir, pdf_filename)
             
-            # 如果已存在，直接返回
             if os.path.exists(dest_path):
                 return dest_path
             
-            # 从assets复制到Download目录
-            try:
-                assets = PYTHON_ACTIVITY.mActivity.getAssets()
-                input_stream = assets.open(pdf_filename)
-                
-                FileOutputStream = autoclass('java.io.FileOutputStream')
-                output_stream = FileOutputStream(dest_path)
-                
-                buffer = bytearray(8192)
-                while True:
-                    length = input_stream.read(buffer)
-                    if length <= 0:
-                        break
-                    output_stream.write(buffer, 0, length)
-                
-                input_stream.close()
-                output_stream.close()
-                
-                if os.path.exists(dest_path):
-                    return dest_path
-            except Exception as e:
-                # 如果assets找不到，尝试应用私有目录
-                pass
+            # 尝试多种路径
+            assets = PYTHON_ACTIVITY.mActivity.getAssets()
+            paths_to_try = [pdf_filename, 'assets/' + pdf_filename, 'private/' + pdf_filename]
             
-            # 备用方案：应用私有目录
-            data_dir = get_data_dir()
-            dest_path = os.path.join(data_dir, pdf_filename)
-            if os.path.exists(dest_path):
-                return dest_path
-                
+            for try_path in paths_to_try:
+                try:
+                    input_stream = assets.open(try_path)
+                    
+                    FileOutputStream = autoclass('java.io.FileOutputStream')
+                    output_stream = FileOutputStream(dest_path)
+                    
+                    buffer = bytearray(8192)
+                    while True:
+                        length = input_stream.read(buffer)
+                        if length <= 0:
+                            break
+                        output_stream.write(buffer, 0, length)
+                    
+                    input_stream.close()
+                    output_stream.close()
+                    
+                    if os.path.exists(dest_path):
+                        return dest_path
+                except:
+                    continue
+                    
         except Exception as e:
             pass
-    else:
-        # 非Android环境
-        if os.path.exists(pdf_filename):
-            return os.path.abspath(pdf_filename)
+        
+        # 方法3：应用私有目录
+        data_dir = get_data_dir()
+        dest_path = os.path.join(data_dir, pdf_filename)
+        if os.path.exists(dest_path):
+            return dest_path
     
     return None
 
