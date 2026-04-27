@@ -1890,6 +1890,5 @@ class PoetryApp(App):
             self.root.get_screen('main').save_data()
         except:
             pass
-
 if __name__ == '__main__':
     PoetryApp().run()
